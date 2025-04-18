@@ -9,6 +9,7 @@ class BackgroundAudioManager: NSObject {
 
     private var scheduledAlarms: Set<Int> = []
     private var silentAudioPlayer: AVAudioPlayer?
+    private var timer: Timer?
 
     override private init() {
         super.init()
@@ -20,7 +21,7 @@ class BackgroundAudioManager: NSObject {
             return
         }
 
-        let filename = registrar.lookupKey(forAsset: "assets/long_blank.mp3", fromPackage: "alarm")
+        let filename = registrar.lookupKey(forAsset: "assets/blank.mp3", fromPackage: "alarm")
         guard let audioPath = Bundle.main.path(forResource: filename, ofType: nil) else {
             os_log(.error, log: BackgroundAudioManager.logger, "Could not find silent audio file.")
             return
@@ -35,13 +36,13 @@ class BackgroundAudioManager: NSObject {
             return
         }
 
-        self.mixOtherAudios()
-        player.numberOfLoops = -1
+        player.numberOfLoops = 0
         player.volume = 0.01
-        player.play()
         self.silentAudioPlayer = player
         NotificationCenter.default.addObserver(self, selector: #selector(self.handleInterruption), name: AVAudioSession.interruptionNotification, object: nil)
 
+        // Play every 10 seconds
+        timer = Timer.scheduledTimer(timeInterval: 10.0, target: self, selector: #selector(self.playSound), userInfo: nil, repeats: true)
         os_log(.debug, log: BackgroundAudioManager.logger, "Started silent player.")
     }
 
@@ -52,9 +53,7 @@ class BackgroundAudioManager: NSObject {
             return
         }
 
-        self.mixOtherAudios()
-        player.pause()
-        player.play()
+        self.playSound()
         os_log(.debug, log: BackgroundAudioManager.logger, "Refreshed silent player.")
     }
 
@@ -65,6 +64,7 @@ class BackgroundAudioManager: NSObject {
         }
 
         NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
+        self.stopTimer()
         player.stop()
         self.silentAudioPlayer = nil
         os_log(.debug, log: BackgroundAudioManager.logger, "Stopped silent player.")
@@ -92,12 +92,24 @@ class BackgroundAudioManager: NSObject {
         switch type {
             case .began:
                 os_log(.debug, log: BackgroundAudioManager.logger, "Interruption began.")
-                self.silentAudioPlayer?.play()
+                self.playSound()
             case .ended:
                 os_log(.debug, log: BackgroundAudioManager.logger, "Interruption ended.")
-                self.silentAudioPlayer?.play()
+                self.playSound()
             default:
                 break
         }
+    }
+
+    @objc private func playSound() {
+        self.mixOtherAudios()
+        self.silentAudioPlayer?.pause()
+        self.silentAudioPlayer?.play()
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+        self.silentAudioPlayer?.stop()
     }
 }
