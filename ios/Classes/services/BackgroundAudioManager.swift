@@ -103,7 +103,6 @@ class BackgroundAudioManager: NSObject {
 
     @objc private func playSound() {
         self.mixOtherAudios()
-        self.silentAudioPlayer?.pause()
         self.silentAudioPlayer?.play()
     }
 
